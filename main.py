@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+from logging.handlers import RotatingFileHandler
 import websockets
 import aiohttp
 import os
@@ -13,9 +14,35 @@ current_directory = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(current_directory, 'config.json')
 LOG_FILE = os.path.join(current_directory, 'log.txt')
 
-# Logger konfigurieren
-logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s | %(levelname)s: %(message)s')
-logger = logging.getLogger(__name__)
+# ------------------------------------------------------------
+# Konfiguration laden (für max_log_file_size)
+# ------------------------------------------------------------
+with open(CONFIG_FILE) as f:
+    cfg = json.load(f)
+
+max_log_file_size = cfg.get("max_log_file_size", 5)  # in MB
+max_bytes = max_log_file_size * 1024 * 1024          # MB → Bytes
+
+# ------------------------------------------------------------
+# Logger mit automatischer Logrotation einrichten
+# ------------------------------------------------------------
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+handler = RotatingFileHandler(
+    LOG_FILE,
+    maxBytes=max_bytes,
+    backupCount=cfg.get("backup_count", 5)
+)
+
+formatter = logging.Formatter('%(asctime)s | %(levelname)s: %(message)s')
+handler.setFormatter(formatter)
+
+# Root-Logger zuerst aufräumen, dann Handler setzen
+logger.handlers.clear()
+logger.addHandler(handler)
+# ------------------------------------------------------------
+
 
 # Setze die erforderlichen Konstanten.
 DIVERA_CORE_URL = 'https://app.divera247.com'
@@ -56,10 +83,8 @@ def send_message(title, text, private_mode, notification_type, send_push, send_m
         "Content-Type": "application/json"
     }
 
-    # URL für das senden der Nachricht definieren.
     message_url = f"https://app.divera247.com/api/v2/news?accesskey={api_key}"
 
-    # Nachricht an DIVERA API senden.
     try:
         req = urllib.request.Request(message_url, method='POST', headers=headers)
         data = json.dumps(message_data).encode('utf-8')
@@ -67,11 +92,11 @@ def send_message(title, text, private_mode, notification_type, send_push, send_m
         result = json.loads(response.read().decode('utf-8'))
         if 'success' in result and result['success']:
             logger.info(text)
-            logging.info("Meldung erfolgreich gesendet.")
+            logger.info("Meldung erfolgreich gesendet.")
         else:
-            logging.error("Fehler beim senden der Meldung. Antwort: %s", result)
+            logger.error("Fehler beim Senden der Meldung. Antwort: %s", result)
     except Exception as e:
-        logging.error("Es ist ein Fehler beim senden der Meldung aufgetreten: %s", e)
+        logger.error("Es ist ein Fehler beim Senden der Meldung aufgetreten: %s", e)
 
 def archive_time(autoarchive_days, autoarchive_hours, autoarchive_minutes, autoarchive_seconds):
     if autoarchive_days == 0 and autoarchive_hours == 0 and autoarchive_minutes == 0 and autoarchive_seconds == 0:
@@ -83,39 +108,33 @@ def archive_time(autoarchive_days, autoarchive_hours, autoarchive_minutes, autoa
 async def authenticate_and_listen():
     while True:
         try:
-            # Hole JWT-Token.
             jwt_response = await fetch_jwt_token()
             jwt = jwt_response['data']['jwt_ws']
 
-            # WebSocket-Verbindung herstellen
             async with websockets.connect(WS_URL + '/ws') as websocket:
                 print('WebSocket-Verbindung hergestellt')
 
-                # Authentifizierungsdaten senden
                 auth_data = {'type': 'authenticate', 'payload': {'jwt': jwt}}
                 await websocket.send(json.dumps(auth_data))
 
-                # Nachrichten empfangen und verarbeiten
                 async for message in websocket:
                     await main(message)
 
         except (websockets.ConnectionClosed, aiohttp.ClientError) as e:
             logger.error(f"Verbindung unterbrochen: {e}")
-            await asyncio.sleep(5)  # Warten, bevor die Verbindung erneut versucht wird
+            await asyncio.sleep(5)
         except Exception as e:
             logger.error(f"Ein Fehler ist aufgetreten: {e}")
-            await asyncio.sleep(5)  # Warten, bevor die Verbindung erneut versucht wird
-
+            await asyncio.sleep(5)
 
 async def fetch_jwt_token():
     config = load_config()
     api_key = config["api_key"]
     async with aiohttp.ClientSession() as session:
-        async with session.get(DIVERA_CORE_URL + '/api/v2/auth/jwt?accesskey=' + api_key) as response:
+        async with session.get(DIVERA_CORE_URL + '/api/v2/auth/jwt?accesskey=' + api_key, ssl=False) as response:
             return await response.json()
 
 async def main(message):
-    # Parameter aus der config.json lesen
     config = load_config()
     api_key = config["api_key"]
     mode = config.get("mode", 1)
@@ -132,66 +151,56 @@ async def main(message):
     users_primaerschluessel = config.get("users_primaerschluessel", [])
     groups_divera = config.get("groups_divera", [])
     message_titel = config["message_titel"]
-    ts_publish = int(time.time())  # Aktueller Unix-Zeitstempel
+    ts_publish = int(time.time())
 
-    # Status jeder ID speichern
     status_dict = config.get("status_dict", {})
 
-    # URL für den Abruf der Fahrzeugstatus definieren.
     url = f"https://app.divera247.com/api/v2/pull/vehicle-status?accesskey={api_key}"
 
-    # Nachricht parsen
     message_data = json.loads(message)
 
-    # Überprüfen, ob der Nachrichtentyp "cluster-vehicle" ist
     if message_data.get('type') == 'cluster-vehicle':
-        # Fahrzeugdaten extrahieren
         vehicle_data = message_data.get('payload', {}).get('vehicle', {})
         if vehicle_data:
-            # ID und fmsstatus_id extrahieren
-            vehicle_id = str(vehicle_data.get('id'))  # Als Zeichenkette konvertieren, um sicherzustellen, dass sie im status_dict vorhanden ist
+            vehicle_id = str(vehicle_data.get('id'))
             fmsstatus_id = vehicle_data.get('fmsstatus_id')
 
             try:
                 with urllib.request.urlopen(url) as response:
                     data = json.loads(response.read().decode())
                     for item in data["data"]:
-                        id = str(item["id"])  # ID als Zeichenkette speichern.
-                        if id == vehicle_id:  # Prüfen, ob es sich um das richtige Fahrzeug handelt
+                        id = str(item["id"])
+                        if id == vehicle_id:
                             fullname = item["fullname"]
                             shortname = item["shortname"]
                             fmsstatus = item["fmsstatus"]
 
-                            # Wenn die ID noch nicht im status_dict ist, wird sie hinzugefügt.
                             if id not in status_dict:
                                 status_dict[id] = fmsstatus
-                                print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Fahrzeug: {shortname} wurde hinzugefügt. Aktueller Status:", status_dict[id])
-                            # Hier Senden der Nachricht
+
                             if mode == 1:
-                                # Wenn sich der Status von 6 auf != 6 oder von !=6 auf 6 ändert, sende eine Mitteilung und aktualisiere den Status.
                                 if (status_dict[vehicle_id] == 6 and fmsstatus_id != 6) or (status_dict[vehicle_id] != 6 and fmsstatus_id == 6):
-                                    message = f"Das Fahrzeug ({shortname}) hat in den Status: {fmsstatus} gewechselt.\n Fahrzeugname: {fullname},\n Kurzname: {shortname},\n FMS Status: {fmsstatus}\n"
-                                    # Funktion zum senden der Mitteilung aufrufen.
-                                    send_message(message_titel, message, private_mode, notification_type, send_push, send_mail, ts_publish, auto_archiv, archive_time(autoarchive_days, autoarchive_hours, autoarchive_minutes, autoarchive_seconds), groups_divera, users_primaerschluessel, api_key)
+                                    msg = f"Das Fahrzeug ({shortname}) hat in den Status: {fmsstatus} gewechselt.\n Fahrzeugname: {fullname},\n Kurzname: {shortname},\n FMS Status: {fmsstatus}\n"
+                                    send_message(message_titel, msg, private_mode, notification_type, send_push, send_mail, ts_publish, auto_archiv, archive_time(autoarchive_days, autoarchive_hours, autoarchive_minutes, autoarchive_seconds), groups_divera, users_primaerschluessel, api_key)
+
                             elif mode == 2:
-                                # Bei jeder Statusänderung eine Mitteilung senden.
                                 if fmsstatus_id != status_dict[vehicle_id]:
-                                    message = f"Das Fahrzeug ({shortname}) hat in den Status: {fmsstatus} gewechselt.\n Fahrzeugname: {fullname},\n Kurzname: {shortname},\n FMS Status: {fmsstatus}\n"
-                                    # Funktion zum senden der Mitteilung aufrufen.
-                                    send_message(message_titel, message, private_mode, notification_type, send_push, send_mail, ts_publish, auto_archiv, archive_time(autoarchive_days, autoarchive_hours, autoarchive_minutes, autoarchive_seconds), groups_divera, users_primaerschluessel, api_key)
+                                    msg = f"Das Fahrzeug ({shortname}) hat in den Status: {fmsstatus} gewechselt.\n Fahrzeugname: {fullname},\n Kurzname: {shortname},\n FMS Status: {fmsstatus}\n"
+                                    send_message(message_titel, msg, private_mode, notification_type, send_push, send_mail, ts_publish, auto_archiv, archive_time(autoarchive_days, autoarchive_hours, autoarchive_minutes, autoarchive_seconds), groups_divera, users_primaerschluessel, api_key)
+
                             elif mode == 3:
-                                # Wenn in den wunsch Status gewechselt wird.
                                 if fmsstatus_id != status_dict[vehicle_id] and fmsstatus_id == destination_fms:
-                                    message = f"Das Fahrzeug ({shortname}) hat in den Status: {fmsstatus} gewechselt.\n Fahrzeugname: {fullname},\n Kurzname: {shortname},\n FMS Status: {fmsstatus}\n"
-                                    # Funktion zum senden der Mitteilung aufrufen.
-                                    send_message(message_titel, message, private_mode, notification_type, send_push, send_mail, ts_publish, auto_archiv, archive_time(autoarchive_days, autoarchive_hours, autoarchive_minutes, autoarchive_seconds), groups_divera, users_primaerschluessel, api_key)
-                            # Aktualisiere den Status für die ID in der config.json.
+                                    msg = f"Das Fahrzeug ({shortname}) hat in den Status: {fmsstatus} gewechselt.\n Fahrzeugname: {fullname},\n Kurzname: {shortname},\n FMS Status: {fmsstatus}\n"
+                                    send_message(message_titel, msg, private_mode, notification_type, send_push, send_mail, ts_publish, auto_archiv, archive_time(autoarchive_days, autoarchive_hours, autoarchive_minutes, autoarchive_seconds), groups_divera, users_primaerschluessel, api_key)
+
                             status_dict[id] = fmsstatus
-                    # Speichere den Status in der Konfigurationsdatei config.json.
+
                     config["status_dict"] = status_dict
                     save_config(config)
+
             except Exception as e:
-                logger.error("Fehler beim Abrufen der Daten:", e)
+                logger.error(f"Fehler beim Abrufen der Daten: {e}")
+
     else:
         print("Daten vom Typ: '", message_data.get('type') + " ' empfangen. Diese Daten werden nicht weiter verarbeitet.")
 

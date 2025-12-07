@@ -64,6 +64,8 @@ def create_config():
     print("Dieses Setup hilft dir die korrekte Config Datei für das Divera Script zu erstellen. Bitte trage deine Daten Schritt für Schritt ein.")
     # Die folgende Zeile setzt den Standardwert auf "DEIN-API-KEY", falls keine Eingabe erfolgt
     config["api_key"] = input("Bitte geben Sie den Privaten API-Schlüssel aus deinem Divera Account ein. (default: DEIN-API-KEY): ") or "DEIN-API-KEY"
+    config["max_log_file_size"] = input("Bitte geben Sie die maximale Logfile größe ein. (default: 5MB): ") or 5
+    config["backup_count"] = input("Bitte geben Sie die Anzahl der maximalen Logfile Dateien ein. (default: 5): ") or 5
     print("Modus 1 = Wenn sich der Status von 6 auf != 6 oder von !=6 auf 6 eine Mitteilung senden.")
     print("Modus 2 = Bei jeder Statusänderung eine Mitteilung senden.")
     print("Modus 3 = Wenn in den wunsch Status gewechselt wird.")
@@ -87,7 +89,9 @@ def create_config():
     # Die folgende Zeile setzt den Standardwert auf False, falls keine Eingabe erfolgt
     config["send_mail"] = input("Soll das Senden von E-Mails aktiviert werden? (true/false, default: false): ").lower() == "true"
     print("Benachrichtigungs ID")
-    print("3 = Ausgewählte Gruppen, 4 = Ausgewählte Benutzer")
+    print("2 = Alle des Standortes, 3 = Ausgewählte Gruppen, 4 = Ausgewählte Benutzer")
+    print("Bei ID = 3 müssen Sie die Gruppen-ID eingeben die Sie benachrichtigen möchten.")
+    print("Bei ID = 4 müssen Sie den Primärschlüssel des Benutzers eingeben der benachrichtigt werden soll. Mehrere Benutzer können durch Kommas getrennt eingeben werden.")
     # Die folgende Zeile setzt den Standardwert auf 4, falls keine Eingabe erfolgt
     config["notification_type"] = input("Bitte geben Sie den Benachrichtigungstyp ein (default: 4): ") or "4"
     # Die folgende Zeile setzt den Standardwert auf True, falls keine Eingabe erfolgt
@@ -108,7 +112,7 @@ def main():
     install_sudo()
 
     # Update und Upgrade
-    #update_upgrade()
+    update_upgrade()
 
     # Überprüfe und installiere erforderliche Module
     required_modules = [
