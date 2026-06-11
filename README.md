@@ -1,93 +1,298 @@
-#Da ich alle meine Bausteine kostenlos zur Verfügung stelle und ich das auch gerne beibehalten möchte, würde ich mich über eine kleine Paypal Spende freuen. Vielen Dank für deine Unterstützung.
+# Divera 24/7 Fahrzeugstatus → Mitteilung
 
+Da ich alle meine Bausteine kostenlos zur Verfügung stelle und ich das auch gerne beibehalten möchte, würde ich mich über eine kleine PayPal-Spende freuen. Vielen Dank für deine Unterstützung.
+
+## ☕ Unterstützung
 
 [Spende eine kleine Aufwandsentschädigung](https://www.paypal.com/donate/?hosted_button_id=SHU2PHYACRRMN)
 
-# Fahrzeugstatusüberwachungs Skript für Divera 24/7
+---
 
-Dieses Python-Skript überwacht den Status von Fahrzeugen und benachrichtigt Benutzer per Divera Mitteilung,
-wenn ein Fahrzeugstatus wechselt. Es gibt verschiedene Modis um das versenden der Mitteilung anzustoßen:
+# Beschreibung
 
-Modus 1 = Wenn sich der Status von 6 auf ungleich 6 oder von ungleich 6 auf 6 ändert wird eine Mitteilung gesendet.
+Dieses Python-Skript überwacht Fahrzeugstatusänderungen in Divera 24/7 in Echtzeit über die WebSocket-Schnittstelle und versendet automatisch Divera-Mitteilungen an definierte Empfänger.
 
-Modus 2 = Bei jeder Statusänderung eine Mitteilung senden.
+Das Skript unterstützt mehrere Organisationen (UCRs) gleichzeitig und erkennt die verfügbaren Organisationen automatisch über den hinterlegten API-Schlüssel.
 
-Modus 3 = Sendet eine Mitteilung, wenn ein bestimmter Zielstatus erreicht wird.
+---
 
-## Voraussetzungen
-Python 3
+# Funktionen
 
-Module: urllib, json, os, datetime, time, logging, websockets, aiohttp, asyncio, subprocess
+* Echtzeitüberwachung von Fahrzeugstatusänderungen
+* Unterstützung mehrerer Organisationen (UCRs)
+* Automatische Erkennung aller verfügbaren Organisationen
+* Individuelle Empfänger je Organisation
+* Versand an Gruppen oder Benutzer
+* Mehrere Benachrichtigungsmodi
+* Mehrere Benachrichtigungsziele
+* Automatische Wiederverbindung bei Verbindungsabbrüchen
+* Duplikat-Filter gegen doppelte Benachrichtigungen
+* Automatische Service-Installation unter Linux
+* Push-Benachrichtigungen optional
+* E-Mail-Benachrichtigungen optional
+* Automatische Archivierung von Mitteilungen
 
-## Konfiguration
-Das Skript erwartet eine Konfigurationsdatei config.json, in der die erforderlichen Informationen wie API-Schlüssel, Empfängergruppen etc. festgelegt sind.
-Eine config-example.json ist dem Repository beigefügt.
-Im Repository ist eine setup.py enthalten die dir bei der erstellung der Konfigurationsdatei hilft.
+---
 
-Das Script läuft auf einem Linux basiertem System wie zb. ein Raspberry Pi.
-Um das Script zu konfigurieren führe folgende Befehle aus:
+# Benachrichtigungsmodi
+
+## Modus 1
+
+Eine Mitteilung wird versendet, wenn sich der Fahrzeugstatus
+
+* von Status 6 auf einen anderen Status ändert oder
+* von einem anderen Status auf Status 6 ändert.
+
+## Modus 2
+
+Bei jeder Fahrzeugstatusänderung wird eine Mitteilung versendet.
+
+## Modus 3
+
+Eine Mitteilung wird versendet, sobald ein definierter Zielstatus erreicht wird.
+
+Beispiel:
+
+```text
+Zielstatus = 2
+
+1 → 2 = Nachricht
+6 → 2 = Nachricht
+3 → 2 = Nachricht
+2 → 2 = keine Nachricht
+```
+
+---
+
+# Benachrichtigungsziele
+
+## source
+
+Die Nachricht wird an die Empfänger der Organisation gesendet, aus der das Fahrzeug stammt.
+
+Beispiel:
+
+```text
+Fahrzeug gehört zu Organisation A
+→ Nachricht an Empfänger von Organisation A
+```
+
+## global
+
+Alle Statusänderungen werden an die Empfänger der ersten konfigurierten Hauptorganisation gesendet.
+
+Beispiel:
+
+```text
+Fahrzeug aus Organisation A
+Fahrzeug aus Organisation B
+Fahrzeug aus Organisation C
+
+→ Alle Nachrichten gehen an dieselben Empfänger
+```
+
+## cluster
+
+Es werden ausschließlich Fahrzeuge eines bestimmten Clusters berücksichtigt.
+
+Beispiel:
+
+```text
+Ziel-Cluster-ID = 12345
+
+Fahrzeug Cluster 12345 → Nachricht
+Fahrzeug Cluster 67890 → keine Nachricht
+```
+
+---
+
+# Voraussetzungen
+
+* Linux (z. B. Raspberry Pi OS, Debian, Ubuntu)
+* Python 3
+* Git
+* sudo
+
+Die benötigten Python-Module werden während des Setups automatisch installiert.
+
+---
+
+# Installation
 
 ```bash
-apt install git
+sudo apt update
+sudo apt install git -y
 
 git clone https://github.com/Sleepwalker86/Divera_FMS_Status_to_Message.git
 
 cd Divera_FMS_Status_to_Message
 
 sudo python3 setup.py
-
 ```
 
-Die Konfigurationsdatei wird nach Abschluss des Setups im Verzeichnis Divera erstellt.
-Wenn Mitteilungen ausgelöst wurden finden Sie diese im Scriptverzeichnis in der Datei log.txt
+---
 
-## Verwendung
-Das Script wird als service im Autostart hinterlegt und nimmt in Echtzeit den Fahrzeugstatus entgegen.
-Das Script wird somit einmal über den Service gestartet und läuft dann permanent im Hintergrund.
+# Einrichtung
 
-```bash
-# Script starten
-service divera_websocket start
+Der Setup-Assistent führt durch die komplette Konfiguration.
 
-# Scrip stoppen
-service divera_websocket stop
+Folgende Einstellungen werden abgefragt:
 
-# Script neustarten
-service divera_websocket restart
+* Privater Divera API-Key
+* Zu überwachende Organisationen
+* Benachrichtigungsmodus
+* Zielstatus (bei Modus 3)
+* Archivierungseinstellungen
+* Push-Benachrichtigungen
+* E-Mail-Benachrichtigungen
+* Privater Modus
+* Titel der Mitteilung
+* Benachrichtigungsziel
+* Empfänger pro Organisation
 
-# Script status
-service divera_websocket status
+Am Ende werden automatisch erstellt:
+
+* `config.json`
+* `divera_websocket.service`
+
+Anschließend wird der Dienst automatisch gestartet.
+
+---
+
+# Empfänger konfigurieren
+
+Für jede Organisation können eigene Empfänger hinterlegt werden.
+
+## Benachrichtigungstyp 3
+
+Versand an ausgewählte Divera-Gruppen.
+
+Beispiel:
+
+```text
+Gruppe Atemschutz
+Gruppe Führung
+Gruppe ELW
 ```
 
-# Vehicle Status Monitoring Script for Divera 24/7
+## Benachrichtigungstyp 4
 
-This Python script monitors the status of vehicles and notifies users via Divera messages when a vehicle status changes. There are different modes to trigger the message sending:
+Versand an ausgewählte Benutzer.
 
-Mode 1 = Sends a message when the status changes from 6 to not equal 6 or from not equal 6 to 6.
+Beispiel:
 
-Mode 2 = Sends a message for every status change.
+```text
+Max Mustermann
+Erika Musterfrau
+```
 
-Mode 3 = Sends a message when a specific target status is reached.
+---
 
-## Requirements
-Python 3
+# Logs
 
-Modules: urllib, json, os, datetime, time, logging, websockets, aiohttp, asyncio, subprocess
+Alle Meldungen und Fehler werden in der Datei
 
-## Configuration
-The script expects a configuration file config.json, where necessary information such as API keys, recipient groups, etc., are defined.
-A config-example.json is included in the repository.
-The repository contains a setup.py that assists you in creating the configuration file.
+```text
+log.txt
+```
 
-The script runs on a Linux-based system such as a Raspberry Pi.
-To configure the script, execute the following commands:
+im Projektverzeichnis gespeichert.
+
+---
+
+# Serviceverwaltung
+
+## Status anzeigen
 
 ```bash
-apt install git
+sudo systemctl status divera_websocket
+```
 
-git clone https://github.com/Sleepwalker86/Divera_FMS_Status_to_Message.git
+## Dienst starten
 
+```bash
+sudo systemctl start divera_websocket
+```
+
+## Dienst stoppen
+
+```bash
+sudo systemctl stop divera_websocket
+```
+
+## Dienst neu starten
+
+```bash
+sudo systemctl restart divera_websocket
+```
+
+## Dienst beim Systemstart aktivieren
+
+```bash
+sudo systemctl enable divera_websocket
+```
+
+## Dienst beim Systemstart deaktivieren
+
+```bash
+sudo systemctl disable divera_websocket
+```
+
+---
+
+# Aktualisierung
+
+```bash
 cd Divera_FMS_Status_to_Message
 
-sudo python3 setup.py
+git pull
+
+sudo systemctl restart divera_websocket
 ```
+
+---
+
+# Fehlerbehebung
+
+## Logdatei anzeigen
+
+```bash
+tail -f log.txt
+```
+
+## Service-Logs anzeigen
+
+```bash
+journalctl -u divera_websocket -f
+```
+
+## Service neu laden
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart divera_websocket
+```
+
+---
+
+# Sicherheitshinweis
+
+Die Datei `config.json` enthält sensible Daten wie den Divera API-Key.
+
+Es wird empfohlen, die Datei nicht zu veröffentlichen und in die `.gitignore` aufzunehmen.
+
+Beispiel:
+
+```gitignore
+config.json
+__pycache__/
+*.log
+```
+
+---
+
+# Lizenz
+
+Dieses Projekt wird kostenlos zur Verfügung gestellt.
+
+Die Nutzung erfolgt auf eigene Verantwortung.
