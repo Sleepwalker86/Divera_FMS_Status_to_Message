@@ -104,6 +104,20 @@ Fahrzeug Cluster 12345 → Nachricht
 Fahrzeug Cluster 67890 → keine Nachricht
 ```
 
+## all
+
+Jede Statusänderung wird an **alle** konfigurierten Organisationen gesendet – pro Organisation ein eigener API-Aufruf mit den jeweils hinterlegten Empfängern (Gruppen oder Benutzer).
+
+Beispiel:
+
+```text
+Organisation A → Gruppen [101, 102]
+Organisation B → Benutzer [220053]
+Organisation C → Gruppen [305]
+
+→ Statusänderung eines beliebigen Fahrzeugs sendet Nachrichten an A, B und C
+```
+
 ---
 
 # Voraussetzungen

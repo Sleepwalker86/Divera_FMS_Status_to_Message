@@ -241,11 +241,12 @@ def create_config():
     print("  global  = Alle Statusänderungen → Empfänger der Hauptorganisation")
     print("  source  = Nachricht geht an die Org, aus der das Fahrzeug stammt")
     print("  cluster = Nur Fahrzeuge eines bestimmten Clusters melden")
+    print("  all     = Nachricht an alle konfigurierten Organisationen senden")
     while True:
         notification_target = input("Ziel eingeben (default: source): ").strip().lower() or "source"
-        if notification_target in ("global", "source", "cluster"):
+        if notification_target in ("global", "source", "cluster", "all"):
             break
-        print(f"  Ungültige Eingabe '{notification_target}' - bitte nur global, source oder cluster eingeben.")
+        print(f"  Ungültige Eingabe '{notification_target}' - bitte nur global, source, cluster oder all eingeben.")
     config["notification_target"] = notification_target
 
     config["notification_target_cluster_id"] = None
