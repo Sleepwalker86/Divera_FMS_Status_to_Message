@@ -98,8 +98,11 @@ def resolve_recipients(config, vehicle_cluster_id):
       "source"  → Empfänger aus der Organisation, zu der das Fahrzeug gehört
       "cluster" → Nur senden wenn Fahrzeug zur notification_target_cluster_id gehört,
                   Empfänger aus dieser Org
-    
-    Gibt zurück: (notification_type, groups_divera, users_primaerschluessel) oder None wenn nicht senden.
+      "all"     → Nachricht an alle konfigurierten Organisationen senden
+
+    Gibt zurück:
+      - Für "all": Liste von (notification_type, groups_divera, users_primaerschluessel, ucr_id)
+      - Sonst: (notification_type, groups_divera, users_primaerschluessel) oder None wenn nicht senden.
     """
     target = config.get("notification_target", "global")
     organizations = config.get("organizations", {})
@@ -142,6 +145,18 @@ def resolve_recipients(config, vehicle_cluster_id):
         if result is None:
             logger.warning(f"Keine Organisation für Cluster-ID {vehicle_cluster_id} gefunden. Nachricht wird nicht gesendet.")
         return result
+
+    elif target == "all":
+        # Nachricht an jede konfigurierte Organisation senden
+        results = []
+        for ucr_id, org in organizations.items():
+            results.append((
+                org.get("notification_type", "4"),
+                org.get("groups_divera", []),
+                org.get("users_primaerschluessel", []),
+                ucr_id
+            ))
+        return results if results else None
 
     return None
 
@@ -218,19 +233,28 @@ async def process_vehicle_message(message_data, ucr_id, cluster_id):
                 if should_send:
                     recipients = resolve_recipients(config, vehicle_cluster_id)
                     if recipients is not None:
-                        notification_type, groups_divera, users_primaerschluessel = recipients
                         message_text = (
                             f"Das Fahrzeug ({shortname}) hat in den Status: {fmsstatus} gewechselt.\n"
                             f" Fahrzeugname: {fullname},\n"
                             f" Kurzname: {shortname},\n"
                             f" FMS Status: {fmsstatus}\n"
                         )
-                        send_message(
-                            message_titel, message_text, private_mode, notification_type,
-                            send_push, send_mail, ts_publish, auto_archiv,
-                            archive_time(autoarchive_days, autoarchive_hours, autoarchive_minutes, autoarchive_seconds),
-                            groups_divera, users_primaerschluessel, api_key, ucr_id
-                        )
+                        ts_archive = archive_time(autoarchive_days, autoarchive_hours, autoarchive_minutes, autoarchive_seconds)
+                        # "all"-Modus liefert eine Liste mit (notification_type, groups, users, ucr_id)
+                        if isinstance(recipients, list):
+                            for notification_type, groups_divera, users_primaerschluessel, target_ucr_id in recipients:
+                                send_message(
+                                    message_titel, message_text, private_mode, notification_type,
+                                    send_push, send_mail, ts_publish, auto_archiv,
+                                    ts_archive, groups_divera, users_primaerschluessel, api_key, target_ucr_id
+                                )
+                        else:
+                            notification_type, groups_divera, users_primaerschluessel = recipients
+                            send_message(
+                                message_titel, message_text, private_mode, notification_type,
+                                send_push, send_mail, ts_publish, auto_archiv,
+                                ts_archive, groups_divera, users_primaerschluessel, api_key, ucr_id
+                            )
 
                 # Status aktualisieren
                 status_dict[vehicle_id] = fmsstatus
@@ -303,6 +327,8 @@ async def authenticate_and_listen():
     print(f"\nBenachrichtigungsmodus: {notification_target}")
     if notification_target == "cluster":
         print(f"Ziel-Cluster-ID: {config.get('notification_target_cluster_id')}")
+    elif notification_target == "all":
+        print(f"Nachricht wird an alle {len(organizations)} Organisation(en) gesendet.")
     print()
 
     # Pro Organisation eine eigene WebSocket-Task starten
