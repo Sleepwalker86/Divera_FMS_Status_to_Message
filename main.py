@@ -155,24 +155,6 @@ async def fetch_jwt_token(api_key, ucr_id=None):
             return await response.json()
 
 
-async def fetch_all_ucr(api_key):
-    """Liest alle verfügbaren UCR-Einträge aus dem JWT-Payload."""
-    jwt_response = await fetch_jwt_token(api_key)
-    jwt_ws = jwt_response['data']['jwt_ws']
-
-    # JWT-Payload dekodieren (ohne Signaturprüfung)
-    payload_b64 = jwt_ws.split(".")[1]
-    payload_b64 += "=" * (4 - len(payload_b64) % 4)
-    payload = json.loads(base64.b64decode(payload_b64))
-
-    ucr_map = {}
-    for ucr_id, info in payload.get("allowed_ucr", {}).items():
-        ucr_map[ucr_id] = {
-            "cluster_id": info["cluster_id"],
-            "name": info.get("name", f"Cluster {info['cluster_id']}")
-        }
-    return ucr_map
-
 
 async def process_vehicle_message(message_data, ucr_id, cluster_id):
     """Verarbeitet eine eingehende WebSocket-Nachricht vom Typ 'cluster-vehicle'."""
@@ -214,8 +196,6 @@ async def process_vehicle_message(message_data, ucr_id, cluster_id):
                 fmsstatus = int(item["fmsstatus"])
                 vehicle_cluster_id = item.get("cluster_id", cluster_id)
                 
-                logger.info(f"vehicle_cluster_id ermittelt: {vehicle_cluster_id} für Fahrzeug {shortname}")
-
                 # Neu gesehenes Fahrzeug eintragen
                 if vehicle_id not in status_dict:
                     status_dict[vehicle_id] = fmsstatus

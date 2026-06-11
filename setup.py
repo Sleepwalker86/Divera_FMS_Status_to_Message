@@ -209,7 +209,12 @@ def create_config():
     print("  1 = Statuswechsel von/nach Status 6 meldet")
     print("  2 = Jede Statusänderung meldet")
     print("  3 = Nur bestimmten Zielstatus melden")
-    config["mode"] = int(input("Modus (default: 1): ") or 1)
+    while True:
+        mode_input = input("Modus (default: 1): ").strip() or "1"
+        if mode_input in ("1", "2", "3"):
+            config["mode"] = int(mode_input)
+            break
+        print(f"  Ungültige Eingabe '{mode_input}' - bitte nur 1, 2 oder 3 eingeben.")
 
     config["destination_fms"] = 2
     if config["mode"] == 3:
@@ -236,10 +241,11 @@ def create_config():
     print("  global  = Alle Statusänderungen → Empfänger der Hauptorganisation")
     print("  source  = Nachricht geht an die Org, aus der das Fahrzeug stammt")
     print("  cluster = Nur Fahrzeuge eines bestimmten Clusters melden")
-    notification_target = input("Ziel eingeben (default: source): ").strip().lower() or "source"
-    if notification_target not in ("global", "source", "cluster"):
-        print("Ungültige Eingabe – 'source' wird verwendet.")
-        notification_target = "source"
+    while True:
+        notification_target = input("Ziel eingeben (default: source): ").strip().lower() or "source"
+        if notification_target in ("global", "source", "cluster"):
+            break
+        print(f"  Ungültige Eingabe '{notification_target}' - bitte nur global, source oder cluster eingeben.")
     config["notification_target"] = notification_target
 
     config["notification_target_cluster_id"] = None
