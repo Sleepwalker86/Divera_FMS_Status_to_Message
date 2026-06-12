@@ -1,4 +1,4 @@
-# Divera 24/7 Fahrzeugstatus → Mitteilung
+# Divera 24/7 Fahrzeugstatus → Mitteilung — v4.0.0
 
 Da ich alle meine Bausteine kostenlos zur Verfügung stelle und ich das auch gerne beibehalten möchte, würde ich mich über eine kleine PayPal-Spende freuen. Vielen Dank für deine Unterstützung.
 
