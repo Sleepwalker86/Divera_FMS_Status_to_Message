@@ -19,6 +19,7 @@ logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s |
 logger = logging.getLogger(__name__)
 
 # Konstanten
+__version__ = "4.0.0"
 DIVERA_CORE_URL = 'https://app.divera247.com'
 WS_URL = 'wss://ws.divera247.com'
 
@@ -319,6 +320,7 @@ async def authenticate_and_listen():
         logger.error("Keine Organisationen in der config.json gefunden. Bitte setup.py erneut ausführen.")
         exit(1)
 
+    print(f"Divera FMS Status to Message v{__version__}")
     print(f"\nStarte Überwachung für {len(organizations)} Organisation(en):")
     for ucr_id, org in organizations.items():
         print(f"  → {org['name']} (Cluster-ID: {org['cluster_id']}, UCR: {ucr_id})")

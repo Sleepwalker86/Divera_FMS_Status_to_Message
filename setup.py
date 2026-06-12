@@ -161,7 +161,7 @@ def configure_recipients(org_name):
 def create_config():
     config = {}
     print("=" * 60)
-    print("  DIVERA 24/7 – Setup Hilfe")
+    print("  DIVERA 24/7 – Setup Hilfe  v4.0.0")
     print("=" * 60)
     print("Dieses Setup hilft dir, die config.json zu erstellen.\n")
 
