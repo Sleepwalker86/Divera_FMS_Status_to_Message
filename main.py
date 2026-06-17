@@ -214,7 +214,10 @@ async def process_vehicle_message(message_data, ucr_id, cluster_id):
                 
                 # Neu gesehenes Fahrzeug eintragen
                 if vehicle_id not in status_dict:
-                    status_dict[vehicle_id] = fmsstatus
+                    # Sentinel -1 für Mode 1: damit eine Transition nach Status 6 beim
+                    # ersten Auftreten korrekt erkannt wird, statt den Ist-Status als
+                    # "Vorher-Wert" zu setzen und die Änderungserkennung zu blockieren.
+                    status_dict[vehicle_id] = -1 if mode == 1 else fmsstatus
                     print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Fahrzeug: {shortname} "
                           f"(Cluster: {vehicle_cluster_id}) hinzugefügt. Status: {fmsstatus}")
 
