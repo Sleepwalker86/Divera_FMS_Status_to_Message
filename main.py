@@ -237,10 +237,22 @@ async def process_vehicle_message(message_data, ucr_id, cluster_id):
                 if should_send:
                     recipients = resolve_recipients(config, vehicle_cluster_id)
                     if recipients is not None:
+                        org_name = next(
+                            (org["name"] for org in config.get("organizations", {}).values()
+                             if str(org.get("cluster_id")) == str(vehicle_cluster_id)),
+                            None
+                        )
+                        dynamic_titel = (
+                            f"{message_titel[:-1]} {org_name}!"
+                            if org_name and message_titel.endswith("!")
+                            else f"{message_titel} {org_name}" if org_name else message_titel
+                        )
+                        einheit_zeile = f" Einheit: {org_name},\n" if org_name else ""
                         message_text = (
                             f"Das Fahrzeug ({shortname}) hat in den Status: {fmsstatus} gewechselt.\n"
                             f" Fahrzeugname: {fullname},\n"
                             f" Kurzname: {shortname},\n"
+                            f"{einheit_zeile}"
                             f" FMS Status: {fmsstatus}\n"
                         )
                         ts_archive = archive_time(autoarchive_days, autoarchive_hours, autoarchive_minutes, autoarchive_seconds)
@@ -248,14 +260,14 @@ async def process_vehicle_message(message_data, ucr_id, cluster_id):
                         if isinstance(recipients, list):
                             for notification_type, groups_divera, users_primaerschluessel, target_ucr_id in recipients:
                                 send_message(
-                                    message_titel, message_text, private_mode, notification_type,
+                                    dynamic_titel, message_text, private_mode, notification_type,
                                     send_push, send_mail, ts_publish, auto_archiv,
                                     ts_archive, groups_divera, users_primaerschluessel, api_key, target_ucr_id
                                 )
                         else:
                             notification_type, groups_divera, users_primaerschluessel = recipients
                             send_message(
-                                message_titel, message_text, private_mode, notification_type,
+                                dynamic_titel, message_text, private_mode, notification_type,
                                 send_push, send_mail, ts_publish, auto_archiv,
                                 ts_archive, groups_divera, users_primaerschluessel, api_key, ucr_id
                             )
