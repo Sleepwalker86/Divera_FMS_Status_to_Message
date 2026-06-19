@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import logging.handlers
 import websockets
 import aiohttp
 import os
@@ -14,18 +15,37 @@ current_directory = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE = os.path.join(current_directory, 'config.json')
 LOG_FILE = os.path.join(current_directory, 'log.txt')
 
-# Logger konfigurieren
-logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format='%(asctime)s | %(levelname)s: %(message)s')
+# Logger konfigurieren – rotiert bei 5 MB, behält 3 Backup-Dateien
+_log_handler = logging.handlers.RotatingFileHandler(
+    LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=3, encoding='utf-8'
+)
+_log_handler.setFormatter(logging.Formatter('%(asctime)s | %(levelname)s: %(message)s'))
+logging.basicConfig(level=logging.INFO, handlers=[_log_handler])
 logger = logging.getLogger(__name__)
 
 # Konstanten
-__version__ = "4.0.0"
+__version__ = "4.1.0"
 DIVERA_CORE_URL = 'https://app.divera247.com'
 WS_URL = 'wss://ws.divera247.com'
 
-# Duplikat-Filter: (vehicle_id, fmsstatus_ts) → verhindert doppelte Verarbeitung über mehrere UCR-Verbindungen
-seen_events: set = set()
+# Duplikat-Filter: (vehicle_id, fmsstatus_ts) → Zeitstempel des ersten Empfangs
+# Einträge werden nach SEEN_EVENTS_TTL_SECONDS automatisch bereinigt.
+SEEN_EVENTS_TTL_SECONDS = 24 * 3600
+seen_events: dict = {}
 seen_lock = asyncio.Lock()
+
+
+async def cleanup_seen_events():
+    """Entfernt abgelaufene Einträge aus seen_events (läuft stündlich)."""
+    while True:
+        await asyncio.sleep(3600)
+        cutoff = time.time() - SEEN_EVENTS_TTL_SECONDS
+        async with seen_lock:
+            expired = [k for k, ts in seen_events.items() if ts < cutoff]
+            for k in expired:
+                del seen_events[k]
+        if expired:
+            logger.info(f"seen_events: {len(expired)} abgelaufene Einträge entfernt.")
 
 
 def load_config():
@@ -310,7 +330,7 @@ async def listen_ucr(api_key, ucr_id, cluster_id, cluster_name):
                             async with seen_lock:
                                 if event_key in seen_events:
                                     continue
-                                seen_events.add(event_key)
+                                seen_events[event_key] = time.time()
 
                         await process_vehicle_message(message_data, ucr_id, cluster_id)
                     else:
@@ -348,11 +368,12 @@ async def authenticate_and_listen():
         print(f"Nachricht wird an alle {len(organizations)} Organisation(en) gesendet.")
     print()
 
-    # Pro Organisation eine eigene WebSocket-Task starten
+    # Pro Organisation eine eigene WebSocket-Task + Hintergrund-Cleanup starten
     tasks = [
         listen_ucr(api_key, ucr_id, org["cluster_id"], org["name"])
         for ucr_id, org in organizations.items()
     ]
+    tasks.append(cleanup_seen_events())
     await asyncio.gather(*tasks)
 
 
